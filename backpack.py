@@ -18,7 +18,7 @@ def GoPack(items, dp, W):
                     res = max(prev_price, price + used)
                     dp[row][col] = res
         
-    return dp
+    return dp[N-1][W-1]
 
 def main():
     N = int(input("Введите кол-во предметов: "))
@@ -38,6 +38,6 @@ def main():
 
     res = GoPack(items, dp, W)
 
-    print(res)
+    print(f"Оптимальная сумма: {res}")
 
 main()
