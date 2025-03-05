@@ -1,46 +1,41 @@
-def allocation(Y, N, F, H):
-    
-    # таблица для хранения максимального объема продукции 
-    dp = [ [0 for _ in range(Y + 1)] for _ in range(N + 1)]
-    
-    for i in range(1, N + 1):
-        for y in range(Y + 1):
-            dp[i][y] = dp[i - 1][y]
-            
-            for x in range(y + 1):
-                if H[i-1](x) < y:
-                    dp[i][y] = max(dp[i][y], dp[i - 1][y - H[i - 1](x)] + F[i - 1](x))
-    
-    return dp
+def ComputingDist(A, B, lng_A, lng_B, D) -> list:
+    # заполнение матрицы D
+    for i in range(lng_A): 
+        D[i][0] = i # удаление всех символов из A
+        for j in range(lng_B): # вставка всех символов из B
+            D[0][j] = j
+            if i > 0 and j > 0:
+                if A[i - 1] == B[j - 1]:
+                    D[i][j] = D[i - 1][j - 1]
+                else:
+                    D[i][j] = min(D[i - 1][j] + 1,
+                                  D[i][j - 1] + 1,
+                                  D[i - 1][j - 1] + 1,
+                    )
 
-def main():
-    while True:
-        N = 4 # Число предприятий 
-        Y = int(input("Введите кол-во единиц ресурса: ")) # Кол-во единиц некоторого ресурса
+    return D
 
-        F = [
-        lambda x: x*15,
-        lambda x: x*12,
-        lambda x: x*14,
-        lambda x: x*22
-        ]
+def main(): 
+    A = input("Введите строку А: ")
+    B = input("Введите строку B: ")
 
-        H = [
-        lambda x: 2*x,
-        lambda x: x,
-        lambda x: 3*x,
-        lambda x: 4*x
-        ]
+    lng_A = len(A) + 1
+    lng_B = len(B) + 1
 
-        res = allocation(Y, N, F, H)
-        print("Результат-Матрица: ", end="\n")
-        for row in res:
-            for elem in row:
-                print(str(elem).ljust(3), end=" ")
-            print()
+    # простор для вычислений
+    D = [[0 for _ in range(lng_B)] for _ in range(lng_A)]
 
+
+    result = ComputingDist(A, B, lng_A, lng_B, D)
+
+    # корректный вывод матрицы
+    for row in result:
+        for elem in row:
+            print(str(elem).ljust(3), end=" ")
         print()
 
-        print(f"Максимальный объем продукции: {res[N][Y]}")
+    print()
+    
+    print(f"Расстояние Левенштейна между \"{A}\" \"{B}\": {result[lng_A - 1][lng_B - 1]} ")
 
 main()
