@@ -9,28 +9,26 @@ import secrets
 import sys
 
 class Hash:
-    def hash_password(password: str, login: str) -> str:
-        """hash + salt"""
+    def hash_password(login: str, password: str,) -> str:
+        """hashing + salting"""
         salt = login + '123879yfhn34d02jd-923dfn8035h42-9h'
         return hashlib.sha512((password + salt).encode()).hexdigest()
 
 class DataBase:
     __users = {
-                'max': '86f81d401fdf767ac7faaedb4bf8e000e8efc1fe05faba05da1100bb8085be8f8acc4c08748de72c1420e1431851146f090626b9b2f5a35f9de092458f35a8c2', 
-                'john': '643d0e177c787c7316aa88e4cc006454d979bd3e90f09d0e4eca20b69d7eb840eef774d8388c31c5bcd7099b6e02daf61771083b7dee0a40b78c7768a2764de3'
+                'max': '1da2e1754bb45683edcb2e224a9460cda5ca9ae66f4769906f91d8cf27ab7c92671b27efb31422911201a9ec5621f1bb94d6d0304dae3c4e1d9e33085598b9d7', 
+                'john': 'b9be7e37625503b2e793b27a1197a9f4fa53c770bb27accd2c7dbecb46f2b41fafca1a5a5b756524daf90ff8e78b9f6c655fdf95cf66ede767b17ab5af8b7687'
              }
 
     # ФУНКЦИИ ДЛЯ БЕЗОПАСНОЙ ПРОВЕРКИ БД
     def check_login(login: str) -> bool:
-        is_correct = login in DataBase.__users.keys()
-        return is_correct
+        return DataBase.__users.get(login) is not None
+        
 
-    def check_password(login, input_psw) -> bool:
+    def check_password(login: str, input_psw: str) -> bool:
         '''secret compare with DB'''
         correct_psw = DataBase.__users.get(login)
-        is_correct = secrets.compare_digest(input_psw, correct_psw)
-        
-        return is_correct
+        return secrets.compare_digest(input_psw, correct_psw)
 
 # Класс инициализации состояний авторизации
 class AuthState(Enum):
@@ -39,20 +37,22 @@ class AuthState(Enum):
     SUCCESS = "Доступ разрешен"
     FAILURE = "Доступ запрещен"
     INVALID_AUTH = "\nERROR: Неверный логин или пароль (Incorrect login or password)\n"
-    RETRIES_ERROR = "\Слишком много попыток. Попробуйте позже"
 
     
 class LoginSystem():
     
     RETRIES_ERROR = "\n[Слишком много попыток. Попробуйте позже]"
-    counter_retries = 0
-    MAX_RETRIES = 5
+    
     def __init__(self) -> None: 
         
         self._state = AuthState.FAILURE
 
         self.login = None
         self.__password = None
+
+        self.BAN_LIMIT = 4
+        self.MAX_RETRIES = 3
+        self.retry_count = 0
 
     def input_login(self) -> None:        
         self._state = AuthState.LOGIN
@@ -65,6 +65,9 @@ class LoginSystem():
             self._state = AuthState.PASSWORD
             self.input_password()
         else:
+            print("[SESSION STATE]: Ввод пароля")
+            fake_psw_input = input('password: ')
+
             self.retry_login()
         
     def input_password(self) -> None:
@@ -72,8 +75,8 @@ class LoginSystem():
 
         # хэшируем
         self.__password = Hash.hash_password(self.login, getpass('password: '))
-        
-        # проверка в бд по хэшу
+    
+        # проверка на совпадение хэшей паролей
         psw = DataBase.check_password(self.login, self.__password)
 
         # если пароли совпадают
@@ -82,28 +85,31 @@ class LoginSystem():
             
         else:
             print(f"[SESSION STATE]: {self}")
+            
             self.retry_login()
         
             
-    def retry_login(self) -> str:
-        LoginSystem.counter_retries += 1
-        if LoginSystem.counter_retries == LoginSystem.MAX_RETRIES:
-            print(LoginSystem.RETRIES_ERROR)
-            time.sleep(5)
-            LoginSystem.counter_retries = 0
+    def retry_login(self) -> None:
+        self.retry_count += 1
+        if self.retry_count >= self.BAN_LIMIT:
+            print(UI.BAN_MESSAGE)
+            sys.exit()
 
+        if self.retry_count % self.MAX_RETRIES == 0:
+            print(LoginSystem.RETRIES_ERROR)
+            time.sleep(3)
         self._state = AuthState.INVALID_AUTH
         
         print(self)
         self.input_login()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self._state.value
 
 
 class UI:
     @staticmethod
-    def show_start_title(user):
+    def show_start_title(user: str) -> None:
         time = datetime.today().strftime("%d.%m.%Y %H:%M:%S")
         print(
             "---------------------------------------------------------------",
@@ -115,7 +121,7 @@ class UI:
         )
 
     @staticmethod
-    def show_end_title(user):
+    def show_end_title(user: str) -> None:
         time = datetime.today().strftime("%d.%m.%Y %H:%M:%S")
         print(
             f"\n├─SESSION STATE: {user}",
@@ -126,7 +132,7 @@ class UI:
         )
 
     @staticmethod
-    def show_desktop(user):
+    def show_desktop(user: str) -> None:
         # Рисуем рабочий стол
         COLORS = {
             "window": "\033[1;36m",
@@ -136,17 +142,17 @@ class UI:
             "reset": "\033[0m"
             }
         # Верхняя панель (системная)
-        top_panel = f"{COLORS['panel']}           TempleOS  │  {datetime.now().strftime('%H:%M')} │  Wifi-Connected             {COLORS['reset']}"
+        top_panel = f"{COLORS['panel']}         kali linux  │  {datetime.now().strftime('%H:%M')} │  Wifi-Connected             {COLORS['reset']}"
 
         desktop = f"""
         {COLORS['window']}┌───────────────────────────────────────┐
-        │{COLORS['text']}  {user}@TempleOS:~$ ./fsociety           {COLORS['window']}│
-        │{COLORS['text']}  OS: TempleOS 6.6.0                   {COLORS['window']}│
+        │{COLORS['text']}  {user}@kali:~$ ./fsociety               {COLORS['window']}│
+        │{COLORS['text']}  OS: kali 6.6.0                       {COLORS['window']}│
         │{COLORS['text']}  Kernel: 6.6.0-Davis                  {COLORS['window']}│
         │{COLORS['text']}  Uptime: 0 days                       {COLORS['window']}│
         │{COLORS['text']}  Shell: /bin/bash                     {COLORS['window']}│
         │{COLORS['text']}  CPU: Intel Terry                     {COLORS['window']}│
-        │{COLORS['text']}  Memory: 128M / 4096M                 {COLORS['window']}│
+        │{COLORS['text']}  Memory: 128M / 8192M                 {COLORS['window']}│
         └───────────────────────────────────────┘"""
 
         # Нижняя панель задач
@@ -155,15 +161,25 @@ class UI:
         print(top_panel)
         print(desktop)
         print()
-        print('\n[Добро пожаловать. Снова 🗲 ]')
+        print('\n               [Добро пожаловать. Снова 🗲 ]')
         print(bottom_panel)
 
     @staticmethod
-    def show_cancel_title():
+    def show_cancel_title() -> None:
         print("\n[SESSION CLOSED]")   
 
+    BAN_MESSAGE = """
+            ⚡️💀 ВАС ЗАБАНИЛИ 💀⚡️
 
-def main():
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    • Все попытки входа записаны
+    • Ваш IP передан в 👮
+    • Доступ уничтожен
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+               ⚠️ Навсегда ⚠️
+    """
+
+def main() -> None:
     try:
         user = LoginSystem()        
         UI.show_start_title(user)
