@@ -8,28 +8,14 @@ import hashlib
 import secrets
 import sys
 
-class Hash:
-    def hash_password(login: str, password: str,) -> str:
-        """hashing + salting"""
-        salt = login + '123879yfhn34d02jd-923dfn8035h42-9h'
-        return hashlib.sha512((password + salt).encode()).hexdigest()
 
 class DataBase:
-    __users = {
+    _users = {
                 'max': '1da2e1754bb45683edcb2e224a9460cda5ca9ae66f4769906f91d8cf27ab7c92671b27efb31422911201a9ec5621f1bb94d6d0304dae3c4e1d9e33085598b9d7', 
                 'john': 'b9be7e37625503b2e793b27a1197a9f4fa53c770bb27accd2c7dbecb46f2b41fafca1a5a5b756524daf90ff8e78b9f6c655fdf95cf66ede767b17ab5af8b7687'
              }
 
-    # ФУНКЦИИ ДЛЯ БЕЗОПАСНОЙ ПРОВЕРКИ БД
-    def check_login(login: str) -> bool:
-        return DataBase.__users.get(login) is not None
         
-
-    def check_password(login: str, input_psw: str) -> bool:
-        '''secret compare with DB'''
-        correct_psw = DataBase.__users.get(login)
-        return secrets.compare_digest(input_psw, correct_psw)
-
 # Класс инициализации состояний авторизации
 class AuthState(Enum):
     LOGIN = "Ввод логина"
@@ -38,11 +24,39 @@ class AuthState(Enum):
     FAILURE = "Доступ запрещен"
     INVALID_AUTH = "\nERROR: Неверный логин или пароль (Incorrect login or password)\n"
 
-    
-class LoginSystem():
-    
+class PasswordManager:
+    def hash_password(login: str, password: str,) -> str:
+        """hashing + salting"""
+        salt = login + '123879yfhn34d02jd-923dfn8035h42-9h'
+        return hashlib.sha512((password + salt).encode()).hexdigest()
+
+    def check_password(login: str, input_psw: str) -> bool:
+        '''secret compare with DB'''
+        correct_psw = DataBase._users.get(login)
+        return secrets.compare_digest(input_psw, correct_psw)
+
+    # ФУНКЦИИ ДЛЯ БЕЗОПАСНОЙ ПРОВЕРКИ БД
+    def check_login(login: str) -> bool:
+        return DataBase._users.get(login) is not None
+
+class DefenceManager:
     RETRIES_ERROR = "\n[Слишком много попыток. Попробуйте позже]"
-    
+    def __init__(self):
+        self.BAN_LIMIT = 4
+        self.MAX_RETRIES = 3
+        self.retry_count = 0
+
+    def check_retries(self):
+        self.retry_count += 1
+        if self.retry_count >= self.BAN_LIMIT:
+            print(UI.BAN_MESSAGE)
+            sys.exit()
+
+        if self.retry_count % self.MAX_RETRIES == 0:
+            print(DefenceManager.RETRIES_ERROR)
+            time.sleep(3)
+        
+class LoginSystem():
     def __init__(self) -> None: 
         
         self._state = AuthState.FAILURE
@@ -56,10 +70,10 @@ class LoginSystem():
 
     def input_login(self) -> None:        
         self._state = AuthState.LOGIN
-        print(f"[SESSION STATE]: {self}")
+        UI.show_state(self)
 
         self.login = input("login: ")
-        __log = DataBase.check_login(self.login)
+        __log = PasswordManager.check_login(self.login)
 
         if __log:
             self._state = AuthState.PASSWORD
@@ -71,35 +85,28 @@ class LoginSystem():
             self.retry_login()
         
     def input_password(self) -> None:
-        print(f"[SESSION STATE]: {self}")
+        UI.show_state(self)
 
         # хэшируем
-        self.__password = Hash.hash_password(self.login, getpass('password: '))
+        self.__password = PasswordManager.hash_password(self.login, getpass('password: '))
     
         # проверка на совпадение хэшей паролей
-        psw = DataBase.check_password(self.login, self.__password)
+        psw = PasswordManager.check_password(self.login, self.__password)
 
         # если пароли совпадают
         if psw:
             self._state = AuthState.SUCCESS
             
         else:
-            print(f"[SESSION STATE]: {self}")
-            
+            UI.show_state(self)
             self.retry_login()
         
             
     def retry_login(self) -> None:
-        self.retry_count += 1
-        if self.retry_count >= self.BAN_LIMIT:
-            print(UI.BAN_MESSAGE)
-            sys.exit()
-
-        if self.retry_count % self.MAX_RETRIES == 0:
-            print(LoginSystem.RETRIES_ERROR)
-            time.sleep(3)
+        self.defence = DefenceManager()
         self._state = AuthState.INVALID_AUTH
         
+        DefenceManager.check_retries(self)
         print(self)
         self.input_login()
 
@@ -130,6 +137,10 @@ class UI:
             "---------------------------------------------------------------",
             sep='\n'
         )
+
+    @staticmethod
+    def show_state(user):
+        print(f"[SESSION STATE]: {user}")
 
     @staticmethod
     def show_desktop(user: str) -> None:
