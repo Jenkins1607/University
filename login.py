@@ -27,12 +27,12 @@ class PasswordManager:
         salt = login + '123879yfhn34d02jd-923dfn8035h42-9h'
         return hashlib.sha512((password + salt).encode()).hexdigest()
 
+    # ФУНКЦИИ ДЛЯ БЕЗОПАСНОЙ ПРОВЕРКИ БД
     def check_password(login: str, input_psw: str) -> bool:
         '''secret compare with DB'''
         correct_psw = DataBase._users.get(login)
         return secrets.compare_digest(input_psw, correct_psw)
 
-    # ФУНКЦИИ ДЛЯ БЕЗОПАСНОЙ ПРОВЕРКИ БД
     def check_login(login: str) -> bool:
         return DataBase._users.get(login) is not None
 
@@ -77,7 +77,7 @@ class LoginSystem():
             self.input_password()
         else:
             print("[SESSION STATE]: Ввод пароля")
-            fake_psw_input = input('password: ')
+            fake_psw_input = getpass('password: ')
 
             self.retry_login()
         
